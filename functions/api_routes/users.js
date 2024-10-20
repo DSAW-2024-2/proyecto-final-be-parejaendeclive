@@ -1,5 +1,6 @@
 const express = require('express');
 const route_users =express.Router();
+const bcryptjs = require('bcryptjs');
 const admin = require('firebase-admin');
 
 admin.initializeApp(
@@ -50,6 +51,7 @@ route_users.post('/',async (req,res) =>{
         if (password.length < 8) {
             return res.status(400).json({ message: "Password must be at least 8 characters long" });
         }
+        let passwordHash = await bcryptjs.hash(password,10);
         
         await dataBase.collection('users').doc('/' + req.body.id + '/').create(
             {
@@ -57,7 +59,7 @@ route_users.post('/',async (req,res) =>{
                 LastName: req.body.LastName,
                 email: req.body.email,
                 number: req.body.number,
-                password: req.body.password
+                password: passwordHash
     
             }
         )
