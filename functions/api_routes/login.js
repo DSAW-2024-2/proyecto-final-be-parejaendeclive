@@ -1,15 +1,15 @@
 const express = require('express');
 const bcryptjs = require('bcryptjs');
-const dataBase = require('../connectionFB');
+const {admin ,dataBase} = require('../connectionFB');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const route_login= express.Router();
-//cookies parse
-
 dotenv.config();
 
+
 route_login.post('/', async (req,res)=>{
-    const {email,password}= req.body
+    
+    const {email,password}= req.body;
     const userLogin = dataBase.collection('users');
     const emailLogin = await userLogin.where('email', '==', email).get();
     try{
