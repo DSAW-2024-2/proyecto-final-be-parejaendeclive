@@ -1,16 +1,10 @@
 const express = require('express');
-const route_users =express.Router();
+const route_register =express.Router();
 const bcryptjs = require('bcryptjs');
-const admin = require('firebase-admin');
+const dataBase = require('../connectionFB');
 
-admin.initializeApp(
-    {
-        credential:admin.credential.cert('./credentials.json') ,
-        databaseURL:"https://proyecto-final-daw-backend-default-rtdb.firebaseio.com"
-    }
-);
 
-const dataBase = admin.firestore();
+
 function string_validation( name, LastName){
     let data =[name,LastName]
     const letters = /^[A-Za-z\s]+$/;
@@ -19,11 +13,11 @@ function string_validation( name, LastName){
 }
 
 
-route_users.get('/', (req, res) => {
-    return res.status(200).json({message: 'users succesfull!'});
+route_register.get('/', (req, res) => {
+    return res.status(200).json({message: 'users succesful!'});
 });
 
-route_users.post('/',async (req,res) =>{
+route_register.post('/',async (req,res) =>{
     try{
         const {id,name,LastName, email, number, password}= req.body;
         if (!id || !name || !LastName || !email || !number ||!password) {
@@ -32,18 +26,19 @@ route_users.post('/',async (req,res) =>{
         
         const users = dataBase.collection('users').doc(id);
         const doc = await users.get();
+        
         if (doc.exists) {
             return res.status(400).json({ message: "ID already in use" });
         }
         
         if (!/^\d+$/.test(id)) {
-            return res.status(400).json({ message: "incorrect type of data: ID must be ONLY numbers" });
+            return res.status(400).json({ message: "incorrect type of data: ID must have ONLY numbers" });
         }
         if (!/^\d+$/.test(number)) {
             return res.status(400).json({ message: "incorrect type of data: number must contain ONLY numbers" });
         }
         if(!string_validation(name,LastName)){
-            return res.status(400).json({ message: "incorrect type of data: name or LastName must be ONLY string" });
+            return res.status(400).json({ message: "incorrect type of data: name or LastName must have ONLY string" });
         }
         if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
             return res.status(400).json({ message: "email must have a valid format" });
@@ -51,9 +46,10 @@ route_users.post('/',async (req,res) =>{
         if (password.length < 8) {
             return res.status(400).json({ message: "Password must be at least 8 characters long" });
         }
+        
         let passwordHash = await bcryptjs.hash(password,10);
         
-        await dataBase.collection('users').doc('/' + req.body.id + '/').create(
+        await dataBase.collection('users').doc(req.body.id).set(
             {
                 name: req.body.name,
                 LastName: req.body.LastName,
@@ -73,4 +69,4 @@ route_users.post('/',async (req,res) =>{
     
 })
 
-module.exports = route_users;
+module.exports = route_register;
