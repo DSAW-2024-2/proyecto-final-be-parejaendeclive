@@ -29,9 +29,9 @@ route_register.post('/',upload.single("photoUser"),async (req,res) =>{
         }
         
         //verify if id exists
-        const users = dataBase.collection('users').doc(id);
-        const doc = await users.get();
-        if (doc.exists) {
+        const idExists = await dataBase.collection('users').where('id', '==', id).get();
+        
+        if (!idExists.empty) {
             return res.status(400).json({ message: "ID already in use" });
         }
 
