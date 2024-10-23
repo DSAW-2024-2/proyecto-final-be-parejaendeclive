@@ -2,7 +2,7 @@ const express = require('express');
 const route_register =express.Router();
 const bcryptjs = require('bcryptjs');
 const dataBase = require('../connectionFB');
-
+//photo user
 
 
 function string_validation( name, LastName){
