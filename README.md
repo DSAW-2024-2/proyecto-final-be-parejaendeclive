@@ -1,4 +1,4 @@
-# Taller en Parejas: Creación de un Endpoint con Express.js
+# Backend desplegado: https://proyecto-final-be-parejaendeclive.vercel.app/
 
 Este proyecto consiste en un reto de desarrollo backend en el que se debe crear un endpoint llamado `user-info` utilizando el framework Express.js. El objetivo principal es que, al hacer una solicitud GET a este endpoint, se retorne un objeto JSON con la información de uno o dos estudiantes, dependiendo de si el equipo está compuesto por una o dos personas.
 
