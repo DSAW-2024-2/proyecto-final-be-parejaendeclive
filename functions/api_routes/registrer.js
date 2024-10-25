@@ -101,7 +101,8 @@ route_register.post('/',upload.single("photoUser"),async (req,res) =>{
         }
             
         await dataBase.collection('users').add(userRegisterData);
-        return res.status(201).json({ message: "User added" });
+        const userId = userRef.id; // El ID generado automáticamente por Firestore
+        return res.status(201).json({ message: "User added",userId });
     }
     catch (error) {
         res.status(500).json({ message: "User not added", error: error.message });

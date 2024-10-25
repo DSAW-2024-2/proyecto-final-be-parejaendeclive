@@ -20,15 +20,16 @@ route_login.post('/', async (req,res)=>{
             return res.status(400).json({error:"user not found"}); 
         }
         let user;
+        let userId;
         emailLogin.forEach(doc => {
         user = doc.data(); 
+        userId= doc.id;
         });
         const credential = await bcryptjs.compare(password, user.password);
         if(!credential){
             return res.status(400).json({error:"Invalid credentials"});
         }
-        const emailUser = user.email;
-        const accessToken = generateToken(emailUser);
+        const accessToken = generateToken(userId);
         return res.status(200).json({ message: "Inicio de sesión exitoso", accessToken });
 
     }
@@ -36,9 +37,9 @@ route_login.post('/', async (req,res)=>{
         res.status(500).json({ message: "failed login", error: error.message });
 
     }
-    function generateToken(emailUser) {
+    function generateToken(userId) {
         //se pone fecha de expiracion para probar que el error 403 funciona en ambos casos
-        return jwt.sign({emailUser}, process.env.JWT_SECRET, { expiresIn: '1h' });
+        return jwt.sign({userId}, process.env.JWT_SECRET, { expiresIn: '1h' });
     }
     
 
