@@ -10,8 +10,17 @@ const {authenticate} = require('./middlewares/authenticate');
 const route_register= require('./api_routes/registrer');
 const route_login= require('./api_routes/login');
 const route_user= require('./api_routes/user');
+const route_car= require('./api_routes/car');
 const app = express();
-app.use(cors());
+const corsOptions = {
+    origin: ['https://proyecto-final-be-parejaendeclive.vercel.app', 'http://localhost:5173'], // Agrega ambos dominios
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+};
+
+app.use(cors(corsOptions));
+
 
 app.use(express.json());
 app.get('/', (req, res) => {
@@ -21,6 +30,7 @@ app.get('/', (req, res) => {
 app.use('/register',route_register);
 app.use('/login',route_login);
 app.use('/user', authenticate, route_user);
+app.use('/car', authenticate, route_car);
 
 
 

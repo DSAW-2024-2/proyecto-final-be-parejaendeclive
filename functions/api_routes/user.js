@@ -118,7 +118,7 @@ route_user.get('/:id',authenticate, async (req,res) =>{
     }
     
 });
-
+//get user information
 route_user.get('/photo/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
