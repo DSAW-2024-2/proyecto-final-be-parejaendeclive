@@ -30,7 +30,7 @@ route_login.post('/', async (req,res)=>{
             return res.status(400).json({error:"Invalid credentials"});
         }
         const accessToken = generateToken(userId);
-        return res.status(200).json({ message: "Inicio de sesión exitoso", accessToken });
+        return res.status(200).json({ message: "succesful login", accessToken });
 
     }
     catch(error){

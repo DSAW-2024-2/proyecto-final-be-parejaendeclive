@@ -4,6 +4,7 @@ const route_user= express.Router();
 
 route_user.get('/', (req, res) => {
     // Lógica para manejar la solicitud
+    //llamar el rol
     res.json({ message: "Acceso a sesión concedido", user: req.user });
 });
 

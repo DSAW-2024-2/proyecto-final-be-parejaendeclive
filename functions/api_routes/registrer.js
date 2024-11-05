@@ -14,12 +14,7 @@ function string_validation( name, LastName){
     
 }
 
-
-
-route_register.get('/',(req, res) => {
-    return res.status(200).json({message: 'users succesful!'});
-});
-
+//Register an user for the first time
 route_register.post('/',upload.single("photoUser"),async (req,res) =>{
     try{
         const {idUser,name,LastName, email, number, password}= req.body;
@@ -85,7 +80,7 @@ route_register.post('/',upload.single("photoUser"),async (req,res) =>{
                 stream.end(req.file.buffer);
             });
         }
-        
+        let role = "pasajero";
         const userRegisterData = 
         {
                 idUser: req.body.idUser,
@@ -93,7 +88,8 @@ route_register.post('/',upload.single("photoUser"),async (req,res) =>{
                 LastName: req.body.LastName,
                 email: req.body.email,
                 number: req.body.number,
-                password: passwordHash
+                password: passwordHash,
+                role:role
         
         }
         if(photoUserURL){
@@ -101,7 +97,7 @@ route_register.post('/',upload.single("photoUser"),async (req,res) =>{
         }
             
         const userRef = await dataBase.collection('users').add(userRegisterData);
-        const userId = userRef.id; // El ID generado automáticamente por Firestore
+        const userId = userRef.id; // The firebase ID 
         return res.status(201).json({ message: "User added",userId });
     }
     catch (error) {
@@ -110,8 +106,8 @@ route_register.post('/',upload.single("photoUser"),async (req,res) =>{
     
 })
 
-//hacer el endpoint put para editar perfil
-route_register.put('/:id',authenticate, async (req,res) =>{
+//Update users info
+route_register.put('/:id',authenticate,upload.single("photoUser"), async (req,res) =>{
     try{
         const { id } = req.params;
         const {idUser,name,LastName, email, number, password}= req.body;
@@ -202,5 +198,7 @@ route_register.put('/:id',authenticate, async (req,res) =>{
         res.status(500).json({ message: "User not updated", error: error.message });
     }
 })
+
+
 
 module.exports = route_register;
