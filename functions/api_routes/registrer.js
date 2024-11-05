@@ -199,6 +199,23 @@ route_register.put('/:id',authenticate,upload.single("photoUser"), async (req,re
     }
 })
 
+//get user's information
+route_register.get('/:id',authenticate, async (req,res) =>{
+    try{
+        const { id }= req.params;
+        const currentUser = await dataBase.collection('users').doc(id).get();
+
+        if(!currentUser){
+        return res.status(404).json({ message: "User not found" });
+        }
+        const userData = currentUser.data();
+        return res.status(200).json({ message: "User data", data:userData });
+    }
+    catch(error){
+        return res.status(200).json({ message: "error retrieving userdata", error:error.message });
+    }
+    
+});
 
 
 module.exports = route_register;
