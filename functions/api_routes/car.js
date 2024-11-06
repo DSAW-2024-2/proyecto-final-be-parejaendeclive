@@ -5,7 +5,7 @@ const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 const { authenticate } = require('../middlewares/authenticate');
 
-// Validaciones para los campos de datos
+// validate car data
 function validateCarData({ carID, carPassengers, carBrand, carModel }) {
     const placaRegex = /^[A-Z]{3}\d{3}$/;
     const lettersRegex = /^[A-Za-z\s]+$/;
@@ -19,7 +19,7 @@ function validateCarData({ carID, carPassengers, carBrand, carModel }) {
     return { valid: true };
 }
 
-// GET /car/:id - Obtener datos del carro
+// get car information
 route_car.get('/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
@@ -33,13 +33,13 @@ route_car.get('/:id', authenticate, async (req, res) => {
     }
 });
 
-// POST /car/:id - Añadir un nuevo carro asociado al usuario
+// Add a new car
 route_car.post('/:id', authenticate, upload.fields([{ name: 'photoCar' }, { name: 'photoSOAT' }]), async (req, res) => {
     try {
-        const { id } = req.params; // ID del usuario
+        const { id } = req.params; // user ID
         const { carID, carPassengers, carBrand, carModel } = req.body;
 
-        // Validaciones
+        // Validations
         const validation = validateCarData({ carID, carPassengers, carBrand, carModel });
         if (!validation.valid) return res.status(400).json({ message: validation.message });
 
@@ -47,7 +47,7 @@ route_car.post('/:id', authenticate, upload.fields([{ name: 'photoCar' }, { name
             return res.status(400).json({ message: 'Missing car photos (photoCar or photoSOAT)' });
         }
 
-        // Subir imágenes a Firebase Storage
+        // upload images in Firebase Storage
         const bucket = admin.storage().bucket();
         const uploadImage = async (file, name) => {
             const fileName = `cars/${carID}_${Date.now()}_${name}`;
@@ -66,14 +66,14 @@ route_car.post('/:id', authenticate, upload.fields([{ name: 'photoCar' }, { name
         const photoCarURL = await uploadImage(req.files.photoCar[0], 'photoCar');
         const photoSOATURL = await uploadImage(req.files.photoSOAT[0], 'photoSOAT');
 
-        // Datos del carro
+        // car data
         const carData = { carID, carPassengers, carBrand, carModel, photoCar: photoCarURL, photoSOAT: photoSOATURL };
 
-        // Guardar carro en Firestore y obtener el ID de Firebase del carro
+        // Save car in firestore
         const carRef = await dataBase.collection('cars').add(carData);
         const carFirestoreID = carRef.id;
 
-        // Actualizar el documento del usuario para incluir el ID del carro creado
+        // update users data collection
         await dataBase.collection('users').doc(id).update({ carID: carFirestoreID });
         
 
@@ -83,7 +83,7 @@ route_car.post('/:id', authenticate, upload.fields([{ name: 'photoCar' }, { name
     }
 });
 
-// PUT /car/:id - Editar el carro
+// PUT /car/:id - update car
 route_car.put('/:id', authenticate, upload.fields([{ name: 'photoCar' }, { name: 'photoSOAT' }]), async (req, res) => {
     try {
         const { id } = req.params;
@@ -97,7 +97,7 @@ route_car.put('/:id', authenticate, upload.fields([{ name: 'photoCar' }, { name:
 
         const updates = { carID, carPassengers, carBrand, carModel };
         
-        // Actualizar imágenes si se envían nuevas
+        // update images if they are new
         const bucket = admin.storage().bucket();
         const uploadImage = async (file, name) => {
             const fileName = `cars/${carID}_${Date.now()}_${name}`;
@@ -127,7 +127,7 @@ route_car.put('/:id', authenticate, upload.fields([{ name: 'photoCar' }, { name:
     }
 });
 
-// DELETE /car/:id - Eliminar el carro
+// DELETE /car/:id - delete car
 route_car.delete('/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
@@ -137,7 +137,7 @@ route_car.delete('/:id', authenticate, async (req, res) => {
 
         await dataBase.collection('cars').doc(id).delete();
         
-        // Actualizar referencia del carro en el usuario
+        // update users car
         await dataBase.collection('users').where('carID', '==', id).get()
             .then(snapshot => {
                 snapshot.forEach(doc => {
