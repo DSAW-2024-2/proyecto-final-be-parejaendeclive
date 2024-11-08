@@ -10,20 +10,12 @@ const {carExistance} = require ('../middlewares/carExistance');
 
 // Validation
 function validateTripData({ startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces }) {
-    const textRegex = /^[A-Za-z\s]+$/;
+    
     const timeRegex = /^([0-1]\d|2[0-3]):([0-5]\d)$/; // Formato HH:mm
     const numberRegex = /^\d+$/;
 
     if (!startTrip || !endTrip || !route || !timeTrip || !priceTrip || !availablePlaces) {
         return { valid: false, message: 'JSON incompleto' };
-    }
-
-    if (!textRegex.test(startTrip)) {
-        return { valid: false, message: 'El inicio del viaje solo puede contener letras y espacios' };
-    }
-
-    if (!textRegex.test(endTrip)) {
-        return { valid: false, message: 'El fin del viaje solo puede contener letras y espacios' };
     }
 
     if (!timeRegex.test(timeTrip)) {
@@ -194,17 +186,19 @@ router.put('/:tripID', authenticate, userExistance,async (req, res) => {
     }
 });
 
-// Endpoint PUT /trips/reserve/:tripID - Reservar un cupo en un viaje
+// Endpoint PUT /trips/reserve/:tripID - Reservar   un viaje
 router.put('/reserve/:tripID', authenticate, async (req, res) => {
     try {
         const { tripID } = req.params;
-        const { stops } = req.body; // Paradas seleccionadas por el usuario
+        const { stops , reservedPlaces } = req.body; // Paradas seleccionadas por el usuario y cupos a reservar
+         // Paradas seleccionadas por el usuario
         const userID = req.user.userId;
 
         // Validar paradas
         if (!Array.isArray(stops) || stops.length === 0) {
             return res.status(400).json({ message: 'Debe proporcionar al menos una parada' });
         }
+
 
         // Verificar si el viaje existe
         const tripDocRef = dataBase.collection('trips').doc(tripID);
@@ -227,14 +221,21 @@ router.put('/reserve/:tripID', authenticate, async (req, res) => {
             if (!tripSnapshot.exists) {
                 throw new Error('Viaje no encontrado durante la transacción');
             }
-
+            console.log("entre");
             const currentAvailable = tripSnapshot.data().availablePlaces;
+            console.log(currentAvailable);
+            
+            if(reservedPlaces > currentAvailable){
+                throw new Error('No hay cupos disponibles para este viaje');
+            }
+            
             if (currentAvailable < 1) {
                 throw new Error('No hay cupos disponibles para este viaje');
             }
+        
 
             transaction.update(tripDocRef, {
-                availablePlaces: currentAvailable - 1,
+                availablePlaces: currentAvailable - reservedPlaces,
                 reservedBy: admin.firestore.FieldValue.arrayUnion(userID),
                 stops: admin.firestore.FieldValue.arrayUnion(...stops)
             });

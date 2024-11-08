@@ -5,8 +5,14 @@ const bcryptjs = require('bcryptjs');
 const {authenticate}= require('../middlewares/authenticate');
 const multer= require('multer');
 const { resolve } = require('path');
-const upload = multer({storage:multer.memoryStorage()});
 
+const upload = multer({storage:multer.memoryStorage()});
+function string_validation( name, LastName){
+    let data =[name,LastName]
+    const letters = /^[A-Za-z\s]+$/;
+    return data.every(item => letters.test(item));
+    
+}
 //Update users info
 route_user.put('/:id',authenticate,upload.single("photoUser"), async (req,res) =>{
     try{
@@ -84,8 +90,8 @@ route_user.put('/:id',authenticate,upload.single("photoUser"), async (req,res) =
                 LastName: req.body.LastName,
                 email: req.body.email,
                 number: req.body.number,
-                password: passwordHash
-                (photoUserURL && { photoUser: photoUserURL }) 
+                password: passwordHash,
+                ...(photoUserURL && { photoUser: photoUserURL }) 
         
         }
         if(photoUserURL){
