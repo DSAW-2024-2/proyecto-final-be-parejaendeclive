@@ -5,6 +5,8 @@ const { admin, dataBase } = require('../connectionFB');
 const { authenticate } = require('../middlewares/authenticate');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
+const {userExistance} = require ('../middlewares/userExistance');
+const {carExistance} = require ('../middlewares/carExistance');
 
 // Validation
 function validateTripData({ startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces }) {
@@ -110,27 +112,23 @@ router.get('/user/:userID', authenticate, async (req, res) => {
 });
 
 // Endpoint POST /trips/:id - Añadir un nuevo viaje a un carro registrado
-router.post('/:id', authenticate, async (req, res) => {
+router.post('/:id', authenticate, carExistance, async (req, res) => {
     try {
+        console.log(req.user);
         const { id } = req.params; // Este es el ID del documento en la colección "cars"
         
         const { startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces, stops } = req.body;
-        const userID = req.user.id; // Asumiendo que el middleware 'authenticate' agrega 'user' al request
+        
+        const userID = req.user.userId; // Asegurarte de que req.user está definido
 
+        if (!userID) {
+            return res.status(400).json({ message: 'ID de usuario no válido' });
+        }
         // Validaciones
         const validation = validateTripData({ startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces });
         if (!validation.valid) {
             return res.status(400).json({ message: validation.message });
         }
-
-        // Verificar si el carro existe
-        const carReference = dataBase.collection('cars').doc(id);
-        const carData = await carReference.get();
-        
-        if (!carData.exists) {  // Usar "exists" para verificar la existencia del documento
-            return res.status(404).json({ message: 'Carro no encontrado' });
-        }
-
         // Crear objeto de viaje
         const tripData = {
             carID: id, // Ahora estamos guardando el ID del carro como "carID" en el viaje
@@ -160,7 +158,7 @@ router.post('/:id', authenticate, async (req, res) => {
 });
 
 // Endpoint PUT /trips/:tripID - Editar un viaje registrado
-router.put('/:tripID', authenticate, async (req, res) => {
+router.put('/:tripID', authenticate, userExistance,async (req, res) => {
     try {
         const { tripID } = req.params;
         const { startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces, stops } = req.body;
@@ -201,7 +199,7 @@ router.put('/reserve/:tripID', authenticate, async (req, res) => {
     try {
         const { tripID } = req.params;
         const { stops } = req.body; // Paradas seleccionadas por el usuario
-        const userID = req.user.id;
+        const userID = req.user.userId;
 
         // Validar paradas
         if (!Array.isArray(stops) || stops.length === 0) {

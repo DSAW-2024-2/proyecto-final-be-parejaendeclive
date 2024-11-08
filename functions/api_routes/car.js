@@ -4,6 +4,7 @@ const { admin, dataBase } = require('../connectionFB');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 const { authenticate } = require('../middlewares/authenticate');
+const { userExistance } = require('../middlewares/userExistance');
 
 // validate car data
 async function validateCarData({ carID, carPassengers, carBrand, carModel }) {
@@ -45,7 +46,7 @@ route_car.get('/:id', authenticate, async (req, res) => {
 });
 
 // Add a new car
-route_car.post('/:id', authenticate, upload.fields([{ name: 'photoCar' }, { name: 'photoSOAT' }]), async (req, res) => {
+route_car.post('/:id', authenticate, userExistance, upload.fields([{ name: 'photoCar' }, { name: 'photoSOAT' }]), async (req, res) => {
     try {
         const { id } = req.params; // user ID
         const { carID, carPassengers, carBrand, carModel } = req.body;
@@ -77,13 +78,6 @@ route_car.post('/:id', authenticate, upload.fields([{ name: 'photoCar' }, { name
         const photoCarURL = await uploadImage(req.files.photoCar[0], 'photoCar');
         const photoSOATURL = await uploadImage(req.files.photoSOAT[0], 'photoSOAT');
         
-        const userReference = await dataBase.collection('users').doc(id);
-        const userData= await userReference.get();
-
-        if(!userData.exists){
-            return res.status(404).json({ message: 'Usuario no encontrado' });
-        }
-
         // car data
         const carData = { carID, carPassengers, carBrand, carModel, photoCar: photoCarURL, photoSOAT: photoSOATURL };
 
@@ -92,20 +86,18 @@ route_car.post('/:id', authenticate, upload.fields([{ name: 'photoCar' }, { name
         const carFirestoreID = carRef.id;
 
         
-        if (userData.exists) {
-            
-            if (userData.data().carIDs) {
-                await userReference.update({
-                    carIDs: admin.firestore.FieldValue.arrayUnion(carFirestoreID)
-                });
-            } else {
-                // Si el campo carIDs no existe, crear el arreglo con el primer ID
-                await userReference.update({
-                    carIDs: [carFirestoreID]
-                });
-            }
+        // Update user's carIDs array or creates the array
+        const userReference = req.userReference;
+        const userData = await userReference.get();
+
+        if (userData.data().carIDs) {
+            await userReference.update({
+                carIDs: admin.firestore.FieldValue.arrayUnion(carFirestoreID)
+            });
         } else {
-            return res.status(404).json({ message: 'User not found' });
+            await userReference.update({
+                carIDs: [carFirestoreID]
+            });
         }
 
         // update users data collection
