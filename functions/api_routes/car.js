@@ -6,11 +6,22 @@ const upload = multer({ storage: multer.memoryStorage() });
 const { authenticate } = require('../middlewares/authenticate');
 
 // validate car data
-function validateCarData({ carID, carPassengers, carBrand, carModel }) {
+async function validateCarData({ carID, carPassengers, carBrand, carModel }) {
     const placaRegex = /^[A-Z]{3}\d{3}$/;
     const lettersRegex = /^[A-Za-z\s]+$/;
     const yearRegex = /^\d+$/;
-
+    if(!carID || !carPassengers || !carBrand || !carModel){
+        return{ valid: false, message: 'JSON incomplete' };
+    }
+    try {
+        // Verificar si el carID ya existe en la base de datos
+        const carIdExistsSnapshot = await dataBase.collection('cars').where('carID', '==', carID).get();
+        if (!carIdExistsSnapshot.empty) {
+            return { valid: false, message: "car ID already exists" };
+        }
+    } catch (error) {
+        return { valid: false, message: 'Database query error', error: error.message };
+    }
     if (!placaRegex.test(carID)) return { valid: false, message: 'Invalid plate format. Must be 3 letters and 3 numbers' };
     if (!/^\d+$/.test(carPassengers)) return { valid: false, message: 'Invalid passengers number format. Only numbers are allowed' };
     if (!lettersRegex.test(carBrand)) return { valid: false, message: 'Car brand must contain only letters' };
@@ -40,7 +51,7 @@ route_car.post('/:id', authenticate, upload.fields([{ name: 'photoCar' }, { name
         const { carID, carPassengers, carBrand, carModel } = req.body;
 
         // Validations
-        const validation = validateCarData({ carID, carPassengers, carBrand, carModel });
+        const validation = await validateCarData({ carID, carPassengers, carBrand, carModel });
         if (!validation.valid) return res.status(400).json({ message: validation.message });
 
         if (!req.files || !req.files.photoCar || !req.files.photoSOAT) {
@@ -65,6 +76,13 @@ route_car.post('/:id', authenticate, upload.fields([{ name: 'photoCar' }, { name
 
         const photoCarURL = await uploadImage(req.files.photoCar[0], 'photoCar');
         const photoSOATURL = await uploadImage(req.files.photoSOAT[0], 'photoSOAT');
+        
+        const userReference = await dataBase.collection('users').doc(id);
+        const userData= await userReference.get();
+
+        if(!userData.exists){
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
 
         // car data
         const carData = { carID, carPassengers, carBrand, carModel, photoCar: photoCarURL, photoSOAT: photoSOATURL };
@@ -73,10 +91,24 @@ route_car.post('/:id', authenticate, upload.fields([{ name: 'photoCar' }, { name
         const carRef = await dataBase.collection('cars').add(carData);
         const carFirestoreID = carRef.id;
 
-        // update users data collection
-        await dataBase.collection('users').doc(id).update({ carID: carFirestoreID });
         
+        if (userData.exists) {
+            
+            if (userData.data().carIDs) {
+                await userReference.update({
+                    carIDs: admin.firestore.FieldValue.arrayUnion(carFirestoreID)
+                });
+            } else {
+                // Si el campo carIDs no existe, crear el arreglo con el primer ID
+                await userReference.update({
+                    carIDs: [carFirestoreID]
+                });
+            }
+        } else {
+            return res.status(404).json({ message: 'User not found' });
+        }
 
+        // update users data collection
         res.status(201).json({ message: 'Car added successfully', carID: carFirestoreID });
     } catch (error) {
         res.status(500).json({ message: 'Error adding car', error: error.message });
@@ -88,9 +120,13 @@ route_car.put('/:id', authenticate, upload.fields([{ name: 'photoCar' }, { name:
     try {
         const { id } = req.params;
         const { carID, carPassengers, carBrand, carModel } = req.body;
-        const validation = validateCarData({ carID, carPassengers, carBrand, carModel });
+        const validation = await validateCarData({ carID, carPassengers, carBrand, carModel });
 
         if (!validation.valid) return res.status(400).json({ message: validation.message });
+        
+        if (!req.files || !req.files.photoCar || !req.files.photoSOAT) {
+            return res.status(400).json({ message: 'Missing car photos (photoCar or photoSOAT)' });
+        }
 
         const carDoc = await dataBase.collection('cars').doc(id).get();
         if (!carDoc.exists) return res.status(404).json({ message: 'Car not found' });
@@ -137,13 +173,18 @@ route_car.delete('/:id', authenticate, async (req, res) => {
 
         await dataBase.collection('cars').doc(id).delete();
         
-        // update users car
-        await dataBase.collection('users').where('carID', '==', id).get()
-            .then(snapshot => {
-                snapshot.forEach(doc => {
-                    dataBase.collection('users').doc(doc.id).update({ carID: admin.firestore.FieldValue.delete() });
+        const users = await dataBase.collection('users').where('carIDs', 'array-contains', id).get();
+
+        if (!users.empty) {
+            const batch = dataBase.batch();
+            users.forEach(doc => {
+                const userRef = dataBase.collection('users').doc(doc.id);
+                batch.update(userRef, {
+                    carIDs: admin.firestore.FieldValue.arrayRemove(id)
                 });
             });
+            await batch.commit();
+        }
 
         res.status(200).json({ message: 'Car deleted successfully' });
     } catch (error) {
