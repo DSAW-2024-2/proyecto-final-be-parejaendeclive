@@ -99,7 +99,7 @@ route_user.put('/:id',authenticate,upload.single("photoUser"), async (req,res) =
         }
             
         const userRef = await dataBase.collection('users').doc(id).update(userUpdatedData);
-        const userId = userRef.id; // El ID generado automáticamente por Firestore
+        const userId = userRef.id; // firebase ID
         return res.status(201).json({ message: "User updated",userId });
     }
     catch (error) {
@@ -144,7 +144,7 @@ route_user.get('/photo/:id', authenticate, async (req, res) => {
         const file = bucket.file(userData.photoUser);
 
         const [fileBuffer] = await file.download();
-        res.set('Content-Type', 'image/jpeg'); // Ajusta el tipo de contenido según el tipo de archivo
+        res.set('Content-Type', 'image/jpeg'); 
         res.send(fileBuffer);
     } catch (error) {
         return res.status(500).json({ message: "Error retrieving user photo", error: error.message });

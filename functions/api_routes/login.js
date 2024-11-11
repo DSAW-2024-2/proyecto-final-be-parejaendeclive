@@ -38,7 +38,7 @@ route_login.post('/', async (req,res)=>{
 
     }
     function generateToken(userId) {
-        //se pone fecha de expiracion para probar que el error 403 funciona en ambos casos
+        //token expiration time
         return jwt.sign({userId}, process.env.JWT_SECRET, { expiresIn: '1h' });
     }
     

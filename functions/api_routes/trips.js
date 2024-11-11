@@ -56,7 +56,7 @@ router.get('/:carID', authenticate, AuthorizationCar, async (req, res) => {
     }
 });
 
-// Endpoint GET /trips - Obtener todos los viajes disponibles
+// Endpoint GET /trips -all trips
 router.get('/', authenticate, async (req, res) => {
     try {
         const tripsSnapshot = await dataBase.collection('trips').where('availablePlaces', '>', 0).get();
@@ -76,7 +76,7 @@ router.get('/', authenticate, async (req, res) => {
     }
 });
 
-// Endpoint GET /trips/user/:userID - Obtener viajes reservados por un usuario
+// Endpoint GET /trips/user/:userID - reserved user trips
 router.get('/user/:userID', authenticate,AuthorizationUser, async (req, res) => {
     try {
         const { userID } = req.params;
@@ -105,42 +105,42 @@ router.get('/user/:userID', authenticate,AuthorizationUser, async (req, res) => 
     }
 });
 
-// Endpoint POST /trips/:id - Añadir un nuevo viaje a un carro registrado
+// Endpoint POST /trips/:id - create a new trips
 router.post('/:id', authenticate,AuthorizationCar, carExistance, async (req, res) => {
     try {
         console.log(req.user);
-        const { id } = req.params; // Este es el ID del documento en la colección "cars"
+        const { id } = req.params; // carID
         
         const { startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces, stops } = req.body;
         
-        const userID = req.user.userId; // Asegurarte de que req.user está definido
+        const userID = req.user.userId; 
 
         if (!userID) {
             return res.status(400).json({ message: 'ID de usuario no válido' });
         }
-        // Validaciones
+        // Validations
         const validation = validateTripData({ startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces });
         if (!validation.valid) {
             return res.status(400).json({ message: validation.message });
         }
-        // Crear objeto de viaje
+        // create trip
         const tripData = {
-            carID: id, // Ahora estamos guardando el ID del carro como "carID" en el viaje
+            carID: id, // we save carID
             startTrip,
             endTrip,
             route,
             timeTrip,
             priceTrip: Number(priceTrip),
             availablePlaces: Number(availablePlaces),
-            stops: stops || [], // Inicialmente vacío o proporcionado
-            reservedBy: [] // Inicialmente vacío
+            stops: stops || [], 
+            reservedBy: [] 
         };
 
-        // Guardar viaje en Firestore
+        // save trip in firebase
         const tripRef = await dataBase.collection('trips').add(tripData);
         const tripID = tripRef.id;
 
-        // Actualizar colección de usuarios (MyTrips)
+        // update (MyTrips)
         await dataBase.collection('users').doc(userID).update({
             myTrips: admin.firestore.FieldValue.arrayUnion(tripID)
         });
@@ -151,25 +151,25 @@ router.post('/:id', authenticate,AuthorizationCar, carExistance, async (req, res
     }
 });
 
-// Endpoint PUT /trips/:tripID - Editar un viaje registrado
-router.put('/:tripID', authenticate,AuthorizationCar, userExistance,async (req, res) => {
+// Endpoint PUT /trips/:tripID - update trip
+router.put('/:tripID', authenticate,async (req, res) => {
     try {
         const { tripID } = req.params;
         const { startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces, stops } = req.body;
 
-        // Validaciones
+        // Validations
         const validation = validateTripData({ startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces });
         if (!validation.valid) {
             return res.status(400).json({ message: validation.message });
         }
 
-        // Verificar si el viaje existe
+        // verify trip existance
         const tripDoc = await dataBase.collection('trips').doc(tripID).get();
         if (!tripDoc.exists) {
             return res.status(404).json({ message: 'Viaje no encontrado' });
         }
 
-        // Actualizar datos del viaje
+        // update trip
         const updates = {
             startTrip,
             endTrip,
@@ -177,7 +177,7 @@ router.put('/:tripID', authenticate,AuthorizationCar, userExistance,async (req, 
             timeTrip,
             priceTrip: Number(priceTrip),
             availablePlaces: Number(availablePlaces),
-            stops: stops || tripDoc.data().stops // Mantener stops existentes si no se proporcionan nuevos
+            stops: stops || tripDoc.data().stops // existance stops conserved
         };
 
         await dataBase.collection('trips').doc(tripID).update(updates);
@@ -188,21 +188,21 @@ router.put('/:tripID', authenticate,AuthorizationCar, userExistance,async (req, 
     }
 });
 
-// Endpoint PUT /trips/reserve/:tripID - Reservar   un viaje
+// Endpoint PUT /trips/reserve/:tripID - book a trip
 router.put('/reserve/:tripID', authenticate, async (req, res) => {
     try {
         const { tripID } = req.params;
-        const { stops , reservedPlaces } = req.body; // Paradas seleccionadas por el usuario y cupos a reservar
-         // Paradas seleccionadas por el usuario
+        const { stops , reservedPlaces } = req.body; 
+        
         const userID = req.user.userId;
 
-        // Validar paradas
+        // stops validation
         if (!Array.isArray(stops) || stops.length === 0) {
             return res.status(400).json({ message: 'Debe proporcionar al menos una parada' });
         }
 
 
-        // Verificar si el viaje existe
+        // Verify trip existance
         const tripDocRef = dataBase.collection('trips').doc(tripID);
         const tripDoc = await tripDocRef.get();
 
@@ -212,20 +212,20 @@ router.put('/reserve/:tripID', authenticate, async (req, res) => {
 
         const tripData = tripDoc.data();
 
-        // Verificar disponibilidad
+        // verify availability
         if (tripData.availablePlaces < 1) {
             return res.status(400).json({ message: 'No hay cupos disponibles para este viaje' });
         }
 
-        // Actualizar disponibilidad y reservas
+        // update vailability and bookinngs
         await dataBase.runTransaction(async (transaction) => {
             const tripSnapshot = await transaction.get(tripDocRef);
             if (!tripSnapshot.exists) {
                 throw new Error('Viaje no encontrado durante la transacción');
             }
-            console.log("entre");
+            
             const currentAvailable = tripSnapshot.data().availablePlaces;
-            console.log(currentAvailable);
+            
             
             if(reservedPlaces > currentAvailable){
                 throw new Error('No hay cupos disponibles para este viaje');
@@ -242,7 +242,7 @@ router.put('/reserve/:tripID', authenticate, async (req, res) => {
                 stops: admin.firestore.FieldValue.arrayUnion(...stops)
             });
 
-            // Actualizar colección de usuarios (reservedTrips)
+            // update users collection
             const userRef = dataBase.collection('users').doc(userID);
             transaction.update(userRef, {
                 reservedTrips: admin.firestore.FieldValue.arrayUnion(tripID)
@@ -255,12 +255,12 @@ router.put('/reserve/:tripID', authenticate, async (req, res) => {
     }
 });
 
-// Endpoint DELETE /trips/:tripID - Opcional: Eliminar un viaje
+// Endpoint DELETE /trips/:tripID - optional delete a trip
 router.delete('/:tripID', authenticate, async (req, res) => {
     try {
         const { tripID } = req.params;
 
-        // Verificar si el viaje existe
+        // verify trip existance
         const tripDoc = await dataBase.collection('trips').doc(tripID).get();
         if (!tripDoc.exists) {
             return res.status(404).json({ message: 'Viaje no encontrado' });
@@ -268,10 +268,10 @@ router.delete('/:tripID', authenticate, async (req, res) => {
 
         
 
-        // Eliminar el viaje
+        // delete trip
         await dataBase.collection('trips').doc(tripID).delete();
 
-        // Eliminar el viaje de los usuarios que lo han reservado
+        // delete trip for users who reserved
         const usersSnapshot = await dataBase.collection('users').where('reservedTrips', 'array-contains', tripID).get();
         const batch = dataBase.batch();
         usersSnapshot.forEach(doc => {
@@ -281,7 +281,7 @@ router.delete('/:tripID', authenticate, async (req, res) => {
         });
         await batch.commit();
         
-        // Eliminar el viaje creado por el conductor
+        // delete trip for driver
         const userDriver = await dataBase.collection('users').where('myTrips', 'array-contains', tripID).get();
         const batch1 = dataBase.batch();
         userDriver.forEach(doc => {

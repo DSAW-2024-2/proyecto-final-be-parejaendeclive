@@ -12,6 +12,7 @@ const route_login= require('./api_routes/login');
 const route_user= require('./api_routes/user');
 const route_car= require('./api_routes/car');
 const route_trips= require('./api_routes/trips');
+const route_roles = require("./api_routes/roles");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -41,6 +42,7 @@ app.use('/login',route_login);
 app.use('/user', authenticate, route_user);
 app.use('/car', authenticate, route_car);
 app.use('/trips', authenticate, route_trips);
+app.use('/roles', authenticate, route_roles);
 
 
 

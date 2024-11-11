@@ -3,24 +3,26 @@ const express = require('express');
 const route_roles = express.Router();
 const { dataBase } = require('../connectionFB');
 const { authenticate } = require('../middlewares/authenticate');
+const {AuthorizationUser} = require('../middlewares/Authorization.User')
 
 // Endpoint GET /roles/:userId
-// Obtiene la información del usuario según el rol (conductor o pasajero)
-router.get('/:id', authenticate, async (req, res) => {
+// get users information depending on the role
+route_roles.get('/:id', authenticate, AuthorizationUser, async (req, res) => {
     try {
-        const { userId } = req.params;
+        const { id } = req.params;
+        console.log('userId:', id); 
 
-        // Obtener el usuario de la base de datos
-        const userDoc = await dataBase.collection('users').doc(userId).get();
+        // gest the user from firebase
+        const userDoc = await dataBase.collection('users').doc(id).get();
         if (!userDoc.exists) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
 
         const userData = userDoc.data();
-        const userRole = userData.role; // El rol actual del usuario (puede ser 'pasajero' o 'conductor')
+        const userRole = userData.role; // actual user role
 
         if (userRole === 'pasajero') {
-            // Si el rol es pasajero, trae todos los viajes disponibles
+            // if role=pasajero, we return all trips(this logic is only in backend)
             const tripsSnapshot = await dataBase.collection('trips').where('availablePlaces', '>', 0).get();
 
             const trips = [];
@@ -31,10 +33,10 @@ router.get('/:id', authenticate, async (req, res) => {
             return res.status(200).json({
                 message: 'Vista de pasajero',
                 role: userRole,
-                trips: trips // Todos los viajes disponibles
+                trips: trips // all trips
             });
         } else if (userRole === 'conductor') {
-            // Si el rol es conductor, trae los viajes creados por el conductor
+            // get drivers created trips
             const myTrips = userData.myTrips || [];
             const tripsSnapshot = await dataBase.collection('trips').where('id', 'in', myTrips).get();
 
@@ -57,18 +59,18 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 // Endpoint PUT /roles/:userId
-// Permite cambiar el rol del usuario entre 'pasajero' y 'conductor'
-router.put('/:id', authenticate, async (req, res) => {
+// change role
+route_roles.put('/:id', authenticate,AuthorizationUser, async (req, res) => {
     try {
-        const { userId } = req.params;
-        const { role } = req.body; // Recibe el rol deseado ('pasajero' o 'conductor')
+        const { id } = req.params;
+        const { role } = req.body; 
 
         if (!['pasajero', 'conductor'].includes(role)) {
             return res.status(400).json({ message: 'Rol inválido. Solo se permite "pasajero" o "conductor"' });
         }
 
-        // Actualizar el rol del usuario en la base de datos
-        const userRef = dataBase.collection('users').doc(userId);
+        // update role in users collection
+        const userRef = dataBase.collection('users').doc(id);
         await userRef.update({ role });
 
         return res.status(200).json({ message: 'Rol actualizado exitosamente', newRole: role });

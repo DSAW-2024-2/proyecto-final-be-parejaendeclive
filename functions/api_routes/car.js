@@ -12,15 +12,15 @@ async function validateCarData({ carID, carPassengers, carBrand, carModel, soatE
     const placaRegex = /^[A-Z]{3}\d{3}$/;
     const lettersRegex = /^[A-Za-z\s]+$/;
     const yearRegex = /^\d+$/;
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/; // Formato YYYY-MM-DD
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/; // Format YYYY-MM-DD
 
-    // Verificar que todos los campos necesarios estén presentes
+    // Verify JSON
     if (!carID || !carPassengers || !carBrand || !carModel || !soatExpiration) {
         return { valid: false, message: 'JSON incompleto' };
     }
 
     try {
-        // Verificar si el carID ya existe en la base de datos
+        // Verify carID existance
         const carIdExistsSnapshot = await dataBase.collection('cars').where('carID', '==', carID).get();
         if (!carIdExistsSnapshot.empty) {
             return { valid: false, message: "El ID del carro ya existe" };
@@ -29,7 +29,7 @@ async function validateCarData({ carID, carPassengers, carBrand, carModel, soatE
         return { valid: false, message: 'Error en la consulta a la base de datos', error: error.message };
     }
 
-    // Validaciones de formato
+    // Validations
     if (!placaRegex.test(carID)) {
         return { valid: false, message: 'Formato de placa inválido. Debe tener 3 letras seguidas de 3 números (e.g., ABC123)' };
     }
@@ -46,7 +46,7 @@ async function validateCarData({ carID, carPassengers, carBrand, carModel, soatE
         return { valid: false, message: 'El año del modelo del carro debe contener solo números' };
     }
 
-    // Validación de soatExpiration
+    // Validation  soatExpiration
     if (!dateRegex.test(soatExpiration)) {
         return { valid: false, message: 'Formato de fecha de vencimiento del SOAT inválido. Debe ser YYYY-MM-DD' };
     }
@@ -54,13 +54,12 @@ async function validateCarData({ carID, carPassengers, carBrand, carModel, soatE
     const soatDate = new Date(soatExpiration);
     const currentDate = new Date();
 
-    // Verificar si la fecha es válida
+    // Verify valid date
     if (isNaN(soatDate.getTime())) {
         return { valid: false, message: 'Fecha de vencimiento del SOAT inválida' };
     }
 
-    // Verificar que la fecha de vencimiento esté antes de la fecha actual
-    // Si deseas asegurarte de que el SOAT NO esté vencido, deberías verificar que la fecha esté después de la actual
+    
     if (soatDate < currentDate) {
         return { valid: false, message: 'La fecha de vencimiento del SOAT ya ha pasado' };
     }

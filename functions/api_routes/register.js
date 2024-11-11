@@ -29,6 +29,12 @@ route_register.post('/',upload.single("photoUser"),async (req,res) =>{
         if (!idExists.empty) {
             return res.status(400).json({ message: "ID already in use" });
         }
+        //verify if email exists
+        const emailExists = await dataBase.collection('users').where('email', '==', email).get();
+        
+        if (!emailExists.empty) {
+            return res.status(400).json({ message: "email already in use" });
+        }
 
         //verify type of data
         if (!/^\d+$/.test(idUser)) {
@@ -144,6 +150,7 @@ route_register.put('/:id',authenticate,upload.single("photoUser"), async (req,re
             return res.status(400).json({ message: "email must have a valid format" });
         }
 
+
         //verify password format
         if (password.length < 8) {
             return res.status(400).json({ message: "Password must be at least 8 characters long" });
@@ -195,7 +202,7 @@ route_register.put('/:id',authenticate,upload.single("photoUser"), async (req,re
         }
             
         const userRef = await dataBase.collection('users').doc(id).update(userUpdatedData);
-        const userId = userRef.id; // El ID generado automáticamente por Firestore
+        const userId = userRef.id; // firebase ID
         return res.status(201).json({ message: "User updated",userId });
     }
     catch (error) {
