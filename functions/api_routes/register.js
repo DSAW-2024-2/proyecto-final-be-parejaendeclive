@@ -58,7 +58,9 @@ route_register.post('/',upload.single("photoUser"),async (req,res) =>{
         //photo user
         if (req.file){
             const bucket = admin.storage().bucket();
-            const fileName = `users/${req.body.id}_${Date.now()}_${req.file.originalname}`;
+            const user= req.body.idUser
+            const fileName = `users/${req.body.idUser}_${Date.now()}_${req.file.originalname}`;
+            console.log(user);
             const file = bucket.file(fileName);
             
             await new Promise ((resolve,reject)=>{
@@ -79,6 +81,7 @@ route_register.post('/',upload.single("photoUser"),async (req,res) =>{
                 });
                 stream.end(req.file.buffer);
             });
+            await file.makePublic();
         }
         let role = "pasajero";
         const userRegisterData = 
@@ -153,7 +156,7 @@ route_register.put('/:id',authenticate,upload.single("photoUser"), async (req,re
         //photo user
         if (req.file){
             const bucket = admin.storage().bucket();
-            const fileName = `users/${req.body.id}_${Date.now()}_${req.file.originalname}`;
+            const fileName = `users/${req.body.userId}_${Date.now()}_${req.file.originalname}`;
             const file = bucket.file(fileName);
             
             await new Promise ((resolve,reject)=>{
@@ -174,6 +177,7 @@ route_register.put('/:id',authenticate,upload.single("photoUser"), async (req,re
                 });
                 stream.end(req.file.buffer);
             });
+            await file.makePublic();
         }
         
         const userUpdatedData = 

@@ -7,6 +7,8 @@ const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 const {userExistance} = require ('../middlewares/userExistance');
 const {carExistance} = require ('../middlewares/carExistance');
+const {AuthorizationCar} = require ('../middlewares/AuthorizationCar');
+const {AuthorizationUser} = require ('../middlewares/Authorization.User');
 
 // Validation
 function validateTripData({ startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces }) {
@@ -34,7 +36,7 @@ function validateTripData({ startTrip, endTrip, route, timeTrip, priceTrip, avai
 }
 
 // Endpoint GET /trips/:carID
-router.get('/:carID', authenticate, async (req, res) => {
+router.get('/:carID', authenticate, AuthorizationCar, async (req, res) => {
     try {
         const { carID } = req.params;
         const carTrips = await dataBase.collection('trips').where('carID', '==', carID).get();
@@ -75,7 +77,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // Endpoint GET /trips/user/:userID - Obtener viajes reservados por un usuario
-router.get('/user/:userID', authenticate, async (req, res) => {
+router.get('/user/:userID', authenticate,AuthorizationUser, async (req, res) => {
     try {
         const { userID } = req.params;
         const userDoc = await dataBase.collection('users').doc(userID).get();
@@ -104,7 +106,7 @@ router.get('/user/:userID', authenticate, async (req, res) => {
 });
 
 // Endpoint POST /trips/:id - Añadir un nuevo viaje a un carro registrado
-router.post('/:id', authenticate, carExistance, async (req, res) => {
+router.post('/:id', authenticate,AuthorizationCar, carExistance, async (req, res) => {
     try {
         console.log(req.user);
         const { id } = req.params; // Este es el ID del documento en la colección "cars"
@@ -150,7 +152,7 @@ router.post('/:id', authenticate, carExistance, async (req, res) => {
 });
 
 // Endpoint PUT /trips/:tripID - Editar un viaje registrado
-router.put('/:tripID', authenticate, userExistance,async (req, res) => {
+router.put('/:tripID', authenticate,AuthorizationCar, userExistance,async (req, res) => {
     try {
         const { tripID } = req.params;
         const { startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces, stops } = req.body;
@@ -278,6 +280,16 @@ router.delete('/:tripID', authenticate, async (req, res) => {
             });
         });
         await batch.commit();
+        
+        // Eliminar el viaje creado por el conductor
+        const userDriver = await dataBase.collection('users').where('myTrips', 'array-contains', tripID).get();
+        const batch1 = dataBase.batch();
+        userDriver.forEach(doc => {
+            batch1.update(doc.ref, {
+            myTrips: admin.firestore.FieldValue.arrayRemove(tripID)
+            });
+        });
+        await batch1.commit();
 
         res.status(200).json({ message: 'Viaje eliminado exitosamente' });
     } catch (error) {
