@@ -11,12 +11,13 @@ const {AuthorizationCar} = require ('../middlewares/AuthorizationCar');
 const {AuthorizationUser} = require ('../middlewares/Authorization.User');
 
 // Validation
-function validateTripData({ startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces }) {
+function validateTripData({ startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces , date }) {
     
     const timeRegex = /^([0-1]\d|2[0-3]):([0-5]\d)$/; // Formato HH:mm
     const numberRegex = /^\d+$/;
+    const dateRegex = /^\d{2}-\d{2}-\d{4}$/;
 
-    if (!startTrip || !endTrip || !route || !timeTrip || !priceTrip || !availablePlaces) {
+    if (!startTrip || !endTrip || !route || !timeTrip || !priceTrip || !availablePlaces ||!date) {
         return { valid: false, message: 'JSON incompleto' };
     }
 
@@ -30,6 +31,9 @@ function validateTripData({ startTrip, endTrip, route, timeTrip, priceTrip, avai
 
     if (!numberRegex.test(availablePlaces)) {
         return { valid: false, message: 'Los cupos disponibles deben ser un número' };
+    }
+    if (!dateRegex.test(date)) {
+        return { valid: false, message: 'La fecha debe tener el formato correcto' };
     }
 
     return { valid: true };
@@ -105,13 +109,13 @@ router.get('/user/:userID', authenticate,AuthorizationUser, async (req, res) => 
     }
 });
 
-// Endpoint POST /trips/:id - create a new trips
+// Endpoint POST /trips/:id car - create a new trips
 router.post('/:id', authenticate,AuthorizationCar, carExistance, async (req, res) => {
     try {
-        console.log(req.user);
-        const { id } = req.params; // carID
         
-        const { startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces, stops } = req.body;
+        const { id } = req.params; // carID
+        console.log(id);
+        const { startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces, stops, date } = req.body;
         
         const userID = req.user.userId; 
 
@@ -119,7 +123,7 @@ router.post('/:id', authenticate,AuthorizationCar, carExistance, async (req, res
             return res.status(400).json({ message: 'ID de usuario no válido' });
         }
         // Validations
-        const validation = validateTripData({ startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces });
+        const validation = validateTripData({ startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces, date });
         if (!validation.valid) {
             return res.status(400).json({ message: validation.message });
         }
@@ -130,6 +134,7 @@ router.post('/:id', authenticate,AuthorizationCar, carExistance, async (req, res
             endTrip,
             route,
             timeTrip,
+            date,
             priceTrip: Number(priceTrip),
             availablePlaces: Number(availablePlaces),
             stops: stops || [], 

@@ -19,7 +19,7 @@ route_user.put('/:id',authenticate,upload.single("photoUser"), async (req,res) =
         const { id } = req.params;
         const {idUser,name,LastName, email, number, password}= req.body;
         
-        if (!idUser|| !name || !LastName || !email || !number ||!password) {
+        if (!idUser|| !name || !LastName || !email || !number ) {
             return res.status(400).json({ message: "incomplete user data" });
         }
         
@@ -48,10 +48,7 @@ route_user.put('/:id',authenticate,upload.single("photoUser"), async (req,res) =
             return res.status(400).json({ message: "email must have a valid format" });
         }
 
-        //verify password format
-        if (password.length < 8) {
-            return res.status(400).json({ message: "Password must be at least 8 characters long" });
-        }
+        
         
         //hash password
         let passwordHash = await bcryptjs.hash(password,10);
@@ -90,11 +87,22 @@ route_user.put('/:id',authenticate,upload.single("photoUser"), async (req,res) =
                 LastName: req.body.LastName,
                 email: req.body.email,
                 number: req.body.number,
-                password: passwordHash,
+                
                 ...(photoUserURL && { photoUser: photoUserURL }) 
         
         }
+         // Solo actualizar la contraseña si fue proporcionada
+        if (password) {
+            if (password.length < 8) {
+                return res.status(400).json({ message: "Password must be at least 8 characters long" });
+            }
+            const passwordHash = await bcrypt.hash(password, 10);
+            userUpdatedData.password = passwordHash;
+
+        }
+        
         if(photoUserURL){
+            console.log(photoUserURL);
             userUpdatedData.photoUser = photoUserURL;
         }
             
