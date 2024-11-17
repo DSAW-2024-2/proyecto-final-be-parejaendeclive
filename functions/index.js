@@ -17,14 +17,18 @@ const route_roles = require("./api_routes/roles");
 const app = express();
 const port = process.env.PORT || 3000;
 const corsOptions = {
-    origin: ['https://proyecto-final-be-parejaendeclive.vercel.app','https://proyecto-final-fe-parejaendeclive.vercel.app'], // Agrega ambos dominios
+    origin: [
+        'https://proyecto-final-fe-parejaendeclive.vercel.app', // Frontend en producción
+        'https://proyecto-final-be-parejaendeclive.vercel.app', // Backend en producción
+        'http://localhost:3000', // Frontend local
+        'http://localhost:5173' // Backend local (ajusta según el puerto que uses)
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 };
 
 app.use(cors(corsOptions));
-
 
 app.use(express.json());
 

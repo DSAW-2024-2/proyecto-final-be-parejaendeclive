@@ -82,6 +82,7 @@ route_register.post('/',upload.single("photoUser"),async (req,res) =>{
 
                 stream.on('finish', async ()=>{
                     photoUserURL = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+                    console.log('File uploaded successfully:', photoUserURL);
                     resolve();
     
                 });
@@ -101,8 +102,10 @@ route_register.post('/',upload.single("photoUser"),async (req,res) =>{
                 role:role
         
         }
+        console.log('File uploaded successfully:', photoUserURL);
         if(photoUserURL){
             userRegisterData.photoUser = photoUserURL;
+            console.log('File uploaded successfully:', photoUserURL);
         }
             
         const userRef = await dataBase.collection('users').add(userRegisterData);
