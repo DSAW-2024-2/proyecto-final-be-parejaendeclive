@@ -9,7 +9,7 @@ const { AuthorizationCar } = require('../middlewares/AuthorizationCar');
 const { AuthorizationUser } = require('../middlewares/Authorization.User');
 
 // Función para validar los datos del carro
-async function validateCarData({ carID, carPassengers, carBrand, carModel, soatExpiration }) {
+async function validateCarData({ carID, carPassengers, carBrand, carModel, soatExpiration, id }) {
     const placaRegex = /^[A-Z]{3}\d{3}$/;
     const lettersRegex = /^[A-Za-z\s]+$/;
     const yearRegex = /^\d+$/;
@@ -22,7 +22,11 @@ async function validateCarData({ carID, carPassengers, carBrand, carModel, soatE
     try {
         const carIdExistsSnapshot = await dataBase.collection('cars').where('carID', '==', carID).get();
         if (!carIdExistsSnapshot.empty) {
-            return { valid: false, message: "El ID del carro ya existe" };
+            const existingCar = carIdExistsSnapshot.docs[0];
+            // Permitir si el carID pertenece al mismo documento
+            if (existingCar.id !== id) {
+                return { valid: false, message: "El ID del carro ya existe" };
+            }
         }
     } catch (error) {
         return { valid: false, message: 'Error en la consulta a la base de datos', error: error.message };
@@ -63,6 +67,7 @@ async function validateCarData({ carID, carPassengers, carBrand, carModel, soatE
 
     return { valid: true };
 }
+
 
 // Obtener información de un carro
 route_car.get('/:id', authenticate, AuthorizationCar, async (req, res) => {
@@ -143,19 +148,36 @@ route_car.post('/:id', authenticate, AuthorizationUser, userExistance, upload.fi
 });
 
 // Actualizar información de un carro
-route_car.put('/:id', authenticate, AuthorizationUser, upload.fields([{ name: 'photoCar' }, { name: 'photoSOAT' }]), async (req, res) => {
+route_car.put('/:id', authenticate, upload.fields([{ name: 'photoCar' }, { name: 'photoSOAT' }]), async (req, res) => {
     try {
         const { id } = req.params;
         const { carID, carPassengers, carBrand, carModel, soatExpiration } = req.body;
 
-        const validation = await validateCarData({ carID, carPassengers, carBrand, carModel, soatExpiration });
-        if (!validation.valid) return res.status(400).json({ message: validation.message });
+        // Validar los datos del carro
+        const validation = await validateCarData({ carID, carPassengers, carBrand, carModel, soatExpiration, id });
+        if (!validation.valid) {
+            return res.status(400).json({ message: validation.message });
+        }
 
+        // Verificar si el carro existe
         const carDoc = await dataBase.collection('cars').doc(id).get();
-        if (!carDoc.exists) return res.status(404).json({ message: 'Car not found' });
+        if (!carDoc.exists) {
+            return res.status(404).json({ message: 'Car not found' });
+        }
+
+        // Verificar si el carID ya existe en otro documento
+        const carQuerySnapshot = await dataBase.collection('cars').where('carID', '==', carID).get();
+        if (!carQuerySnapshot.empty) {
+            const existingCar = carQuerySnapshot.docs[0];
+            // Permitir el mismo ID si pertenece al documento actual
+            if (existingCar.id !== id) {
+                return res.status(400).json({ message: 'Car ID already exists' });
+            }
+        }
 
         const updates = { carID, carPassengers, carBrand, carModel, soatExpiration };
 
+        // Manejar imágenes si se proporcionan
         const bucket = admin.storage().bucket();
         const uploadImage = async (file, name) => {
             const fileName = `cars/${carID}_${Date.now()}_${name}`;
@@ -179,12 +201,14 @@ route_car.put('/:id', authenticate, AuthorizationUser, upload.fields([{ name: 'p
             updates.photoSOAT = await uploadImage(req.files.photoSOAT[0], 'photoSOAT');
         }
 
+        // Actualizar el documento en Firestore
         await dataBase.collection('cars').doc(id).update(updates);
         res.status(200).json({ message: 'Car updated successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error updating car', error: error.message });
     }
 });
+
 
 // Eliminar un carro
 route_car.delete('/:id', authenticate, AuthorizationCar, async (req, res) => {
