@@ -198,19 +198,19 @@ router.put('/:tripID', authenticate, async (req, res) => {
             return res.status(404).json({ message: 'Trip not found' });
         }
 
-        const updates = {
-            startTrip,
-            endTrip,
-            route,
-            timeTrip,
-            priceTrip: Number(priceTrip),
-            availablePlaces: Number(availablePlaces),
-            stops: stops || tripDoc.data().stops,
-        };
+        const updates = {};
+
+        if (startTrip) updates.startTrip = startTrip;
+        if (endTrip) updates.endTrip = endTrip;
+        if (route) updates.route = route;
+        if (timeTrip) updates.timeTrip = timeTrip;
+        if (priceTrip) updates.priceTrip = Number(priceTrip);
+        if (availablePlaces !== undefined) updates.availablePlaces = Number(availablePlaces);
+        if (stops) updates.stops = stops;
 
         await tripRef.update(updates);
 
-        // Update trip status
+        // Actualizar el estado del viaje
         await updateTripStatus(tripID);
 
         res.status(200).json({ message: 'Trip updated successfully' });
@@ -219,51 +219,120 @@ router.put('/:tripID', authenticate, async (req, res) => {
     }
 });
 
-// 6. Endpoint to reserve a trip
 router.put('/reserve/:tripID', authenticate, async (req, res) => {
     try {
         const { tripID } = req.params;
-        const { stops, reservedPlaces } = req.body;
         const userID = req.user.userId;
+        const { reservedPlaces, stops } = req.body;
 
         const tripRef = dataBase.collection('trips').doc(tripID);
-        const tripDoc = await tripRef.get();
-
-        if (!tripDoc.exists) {
-            return res.status(404).json({ message: 'Trip not found' });
-        }
-
-        const tripData = tripDoc.data();
-
-        if (tripData.availablePlaces < reservedPlaces) {
-            return res.status(400).json({ message: 'Not enough available places' });
-        }
 
         await dataBase.runTransaction(async (transaction) => {
-            const currentAvailable = tripData.availablePlaces;
+            const tripDoc = await transaction.get(tripRef);
+            if (!tripDoc.exists) {
+                throw new Error('Trip not found');
+            }
 
-            transaction.update(tripRef, {
-                availablePlaces: currentAvailable - reservedPlaces,
-                reservedBy: admin.firestore.FieldValue.arrayUnion(userID),
-                stops: admin.firestore.FieldValue.arrayUnion(...stops),
+            const tripData = tripDoc.data();
+
+            // Validar disponibilidad de lugares
+            if (tripData.availablePlaces < reservedPlaces) {
+                throw new Error('Not enough available places');
+            }
+
+            // Actualizar availablePlaces
+            tripData.availablePlaces -= reservedPlaces;
+
+            // Agregar la reserva del usuario
+            tripData.reservedBy.push({
+                userID: userID,
+                reservedPlaces: reservedPlaces,
+                stops: stops
             });
 
+            // Actualizar la lista de paradas generales (eliminar duplicados)
+            const updatedStops = Array.from(new Set([...tripData.stops, ...stops]));
+
+            // Actualizar el documento del viaje
+            transaction.update(tripRef, {
+                availablePlaces: tripData.availablePlaces,
+                reservedBy: tripData.reservedBy,
+                stops: updatedStops // Actualizar las paradas generales
+            });
+
+            // Actualizar los datos del usuario
             const userRef = dataBase.collection('users').doc(userID);
             transaction.update(userRef, {
                 reservedTrips: admin.firestore.FieldValue.arrayUnion(tripID),
             });
         });
 
-        // Update trip status
+        // Actualizar el estado del viaje si es necesario
         await updateTripStatus(tripID);
 
         res.status(200).json({ message: 'Reservation successful' });
     } catch (error) {
-        res.status(500).json({ message: `Error reserving trip: ${error.message}` });
+        res.status(500).json({ message: `Error making reservation: ${error.message}` });
     }
 });
 
-// 7. Endpoint to cancel a stop in a trip
+
+// 7. Endpoint para cancelar una reserva
+router.delete('/reservation/:tripID', authenticate, async (req, res) => {
+    try {
+        const { tripID } = req.params;
+        const userID = req.user.userId;
+        const tripRef = dataBase.collection('trips').doc(tripID);
+  
+        await dataBase.runTransaction(async (transaction) => {
+            // Leer tripData dentro de la transacción
+            const tripDoc = await transaction.get(tripRef);
+  
+            if (!tripDoc.exists) {
+                throw new Error('Trip not found');
+            }
+            const tripData = tripDoc.data();
+  
+            // Buscar la reservación del usuario
+            const reservationIndex = tripData.reservedBy.findIndex(res => res.userID === userID);
+            if (reservationIndex === -1) {
+                throw new Error('Reservation not found for this user');
+            }
+  
+            const reservation = tripData.reservedBy[reservationIndex];
+            const reservedPlaces = reservation.reservedPlaces;
+
+            // Eliminar las paradas reservadas por el usuario de la lista general de paradas
+            const stopsToRemove = reservation.stops || [];
+            tripData.stops = tripData.stops.filter(stop => !stopsToRemove.includes(stop));
+
+            // Actualizar availablePlaces y remover la reserva
+            tripData.availablePlaces += reservedPlaces;
+            tripData.reservedBy.splice(reservationIndex, 1);
+  
+            // Actualizar el viaje en la base de datos
+            transaction.update(tripRef, {
+                availablePlaces: tripData.availablePlaces,
+                reservedBy: tripData.reservedBy,
+                stops: tripData.stops, // Actualizar las paradas generales
+            });
+
+            // Actualizar los viajes reservados del usuario
+            const userRef = dataBase.collection('users').doc(userID);
+            transaction.update(userRef, {
+                reservedTrips: admin.firestore.FieldValue.arrayRemove(tripID),
+            });
+        });
+  
+        // Actualizar el estado del viaje si es necesario
+        await updateTripStatus(tripID);
+  
+        res.status(200).json({ message: 'Reservation canceled successfully, stops removed' });
+    } catch (error) {
+        res.status(500).json({ message: `Error canceling reservation: ${error.message}` });
+    }
+});
+// 8. Endpoint to cancel a stop in a trip
 router.put('/cancel-stop/:tripID', authenticate, AuthorizationCar, async (req, res) => {
     try {
         const { tripID } = req.params;
@@ -290,64 +359,6 @@ router.put('/cancel-stop/:tripID', authenticate, AuthorizationCar, async (req, r
         res.status(500).json({ message: `Error canceling stop: ${error.message}` });
     }
 });
-//eliminar
-router.delete('/reservation/:tripID', authenticate, async (req, res) => {
-    try {
-        const { tripID } = req.params;
-        const userID = req.user.userId;
-
-        const tripRef = dataBase.collection('trips').doc(tripID);
-
-        await dataBase.runTransaction(async (transaction) => {
-            // Leer tripData dentro de la transacción
-            const tripDoc = await transaction.get(tripRef);
-
-            if (!tripDoc.exists) {
-                throw new Error('Trip not found');
-            }
-
-            const tripData = tripDoc.data();
-
-            // Verificar si el usuario reservó este viaje
-            if (!tripData.reservedBy.includes(userID)) {
-                throw new Error('User did not reserve this trip');
-            }
-
-            // Identificar las paradas asociadas con la reserva del usuario
-            const userStops = tripData.stops.filter(stop => stop.userID === userID);
-            const reservedPlaces = userStops.length; // Número de paradas = lugares reservados
-
-            // Actualizar el documento del viaje
-            const tripUpdate = {
-                availablePlaces: tripData.availablePlaces + reservedPlaces,
-                reservedBy: admin.firestore.FieldValue.arrayRemove(userID),
-            };
-
-            // Eliminar las paradas del usuario si existen
-            if (userStops.length > 0) {
-                tripUpdate.stops = admin.firestore.FieldValue.arrayRemove(...userStops);
-            }
-
-            transaction.update(tripRef, tripUpdate);
-
-            // Actualizar el documento del usuario
-            const userRef = dataBase.collection('users').doc(userID);
-            transaction.update(userRef, {
-                reservedTrips: admin.firestore.FieldValue.arrayRemove(tripID),
-            });
-        });
-
-        // Actualizar el estado del viaje
-        await updateTripStatus(tripID);
-
-        res.status(200).json({ message: 'Reservation and associated stops canceled successfully' });
-    } catch (error) {
-        res.status(500).json({ message: `Error canceling reservation: ${error.message}` });
-    }
-});
-
-
-
 
 // 9. Endpoint to cancel a trip
 router.delete('/cancel/:tripID', authenticate, AuthorizationCar, async (req, res) => {
