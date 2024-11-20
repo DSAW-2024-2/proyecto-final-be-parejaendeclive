@@ -96,7 +96,7 @@ route_user.put('/:id',authenticate,upload.single("photoUser"), async (req,res) =
             if (password.length < 8) {
                 return res.status(400).json({ message: "Password must be at least 8 characters long" });
             }
-            const passwordHash = await bcrypt.hash(password, 10);
+            const passwordHash = await bcryptjs.hash(password, 10);
             userUpdatedData.password = passwordHash;
 
         }
