@@ -59,10 +59,10 @@ async function updateTripStatus(tripID) {
 }
 
 // 1. Endpoint to get trips for a car
-router.get('/:carID', authenticate, AuthorizationCar, async (req, res) => {
+router.get('/:id', authenticate, AuthorizationCar, async (req, res) => {
     try {
-        const { carID } = req.params;
-        const carTrips = await dataBase.collection('trips').where('carID', '==', carID).get();
+        const { id: carID } = req.params;
+        const carTrips = await dataBase.collection('trips').where('carId', '==', carID).get();
 
         if (carTrips.empty) {
             return res.status(404).json({ message: 'There are no trips for this car' });
@@ -132,22 +132,32 @@ router.get('/user/:userID', authenticate, AuthorizationUser, async (req, res) =>
 });
 
 // 4. Endpoint to create a new trip
-router.post('/:id', authenticate, AuthorizationCar, async (req, res) => {
+router.post('/:id', authenticate, async (req, res) => {
     try {
-        const { id: carID } = req.params;
+        const { id: carId } = req.params;
         const { startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces, stops, date } = req.body;
         const userID = req.user.userId;
+        console.log('Usuario autenticado:', req.user); // Verifica req.user
+        console.log('Parámetros:', req.params); // Verifica carId en req.params
+        console.log('Cuerpo de la solicitud:', req.body); // Verifica los datos del formulario
 
         if (!userID) {
             return res.status(400).json({ message: 'Invalid user ID' });
         }
 
-        const carDoc = await dataBase.collection('cars').doc(carID).get();
+        const carDoc = await dataBase.collection('cars').doc(carId).get();
         if (!carDoc.exists) {
             return res.status(404).json({ message: 'Car not found' });
         }
+        const UserDoc = await dataBase.collection('users').doc(userID).get();
+        if (!UserDoc.exists) {
+            return res.status(404).json({ message: 'user not found' });
+        }
 
-        const { carPassengers } = carDoc.data();
+        const { carPassengers, carID } = carDoc.data();
+        const { number} = UserDoc.data();
+        console.log(number);
+        
         const validation = validateTripData({ startTrip, endTrip, route, timeTrip, priceTrip, availablePlaces, date });
         if (!validation.valid) {
             return res.status(400).json({ message: validation.message });
@@ -159,12 +169,14 @@ router.post('/:id', authenticate, AuthorizationCar, async (req, res) => {
         }
 
         const tripData = {
+            carId,
             carID,
             startTrip,
             endTrip,
             route,
             timeTrip,
             date,
+            number,
             priceTrip: Number(priceTrip),
             availablePlaces: Number(availablePlaces),
             stops: stops || [],
@@ -184,6 +196,7 @@ router.post('/:id', authenticate, AuthorizationCar, async (req, res) => {
         res.status(500).json({ message: `Error creating trip: ${error.message}` });
     }
 });
+
 
 // 5. Endpoint to update a trip
 router.put('/:tripID', authenticate, async (req, res) => {

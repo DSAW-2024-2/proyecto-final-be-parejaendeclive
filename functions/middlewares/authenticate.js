@@ -5,6 +5,8 @@ dotenv.config();
 
 function authenticate(req, res, next) {
     const authHeader = req.headers['authorization'];
+    
+    console.log('Encabezado Authorization:', authHeader);
     const token = authHeader && authHeader.split(' ')[1]; // token from header
 
     // if not token return error
